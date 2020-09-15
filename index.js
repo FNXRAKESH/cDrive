@@ -33,12 +33,14 @@ app.use(bodyParser.urlencoded({ extended: true }));
 
 var db;
 const mongoose = require('mongoose');
+const { token } = require('morgan');
 mongoose.connect('mongodb+srv://rakesh:uDrive@udrive.138if.mongodb.net/uDrive?retryWrites=true&w=majority', function (err, database) {
     if (err) return console.log("error ", err)
     db = database;
     console.log('App is listening on port ' + port);
 })
 app.post('/api/register', (req, res) => {
+    console.log(req.body);
     var ObjectID = require('mongodb').ObjectID;
     var user = {
         phone: req.body.phone,
@@ -54,6 +56,22 @@ app.post('/api/register', (req, res) => {
             res.json({ data: 'record added' })
         }
 
+    });
+})
+app.post('/api/pushNotification', (req, res) => {
+    console.log(req.body);
+    var ObjectID = require('mongodb').ObjectID;
+    var user = {
+        token: req.body.token,
+        _id: new ObjectID()
+    };
+    const query = db.collection('PushNotification').find({ token: req.body.token }).toArray(function (err, result) {
+        console.log(result);
+        if (result.length > 0) return res.json({ data: 'already added' })
+        else {
+            db.collection('PushNotification').insertOne(user);
+            res.json({ data: 'record added' })
+        }
     });
 })
 
@@ -74,6 +92,7 @@ app.post('/api/login', (req, res) => {
                 phone = data.phone
                 if (data.carDetails !== undefined) {
                     number = data.carDetails.number
+
                 }
             })
         }
@@ -88,6 +107,7 @@ app.post('/api/addTrip', (req, res) => {
     var ObjectID = require('mongodb').ObjectID;
     var today = new Date();
     var trip = {
+        postedBy: req.body.phone,
         fromLat: req.body.fromLat,
         fromLong: req.body.fromLong,
         toLat: req.body.toLat,
@@ -97,7 +117,7 @@ app.post('/api/addTrip', (req, res) => {
         passengersCount: req.body.selectedValue,
         fromAddress: req.body.fromAddress,
         toAddress: req.body.toAddress,
-        date: today.getFullYear() + '-' + (today.getMonth() + 1) + '-' + today.getDate(),
+        date: today,
         status: "new trip",
         tripId: uuid(),
         rate: req.body.rate,
@@ -108,7 +128,20 @@ app.post('/api/addTrip', (req, res) => {
     const query = db.collection('Trip').insertOne(trip);
     res.json({ data: 'trip added' })
 });
+app.post('/api/showAdminTrip', (req, res) => {
+    console.log("showAdminTrip api ", req.body);
+    var ObjectID = require('mongodb').ObjectID;
+    const query = db.collection('Trip').find({ postedBy: req.body.phone }).toArray(function (err, result) {
+        if (err) throw err;
 
+        if (result.length <= 0) return res.json({ data: 'no data' })
+        else {
+            var data = result.sort((a, b) => (a.date > b.date) ? -1 : ((b.date > a.date) ? 1 : 0));
+            res.send(data)
+        }
+
+    });
+})
 app.get('/api/showTrip', (req, res) => {
     console.log("show trip api");
     var ObjectID = require('mongodb').ObjectID;
@@ -128,7 +161,7 @@ app.post('/api/acceptTrip', (req, res) => {
     console.log("Accept trip ", req.body);
     var ObjectID = require('mongodb').ObjectID;
     const query = db.collection('Registration').find({ phone: req.body.phone }).toArray(function (err, result) {
-        if (result.length <= 0) return res.json({ data: 'no data' })
+        if (result.length <= 0) return res.json({ data: 'no phone' })
         else {
             result.map(res => {
                 res.carDetails.location = req.body.address
