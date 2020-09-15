@@ -67,10 +67,10 @@ app.post('/api/pushNotification', (req, res) => {
     };
     const query = db.collection('PushNotification').find({ token: req.body.token }).toArray(function (err, result) {
         console.log(result);
-        if (result.length > 0) return res.json({ data: 'already added' })
+        if (result.length > 0) return res.json({ data: 'already added this pushNotification' })
         else {
             db.collection('PushNotification').insertOne(user);
-            res.json({ data: 'record added' })
+            res.json({ data: 'pushNotification added' })
         }
     });
 })
@@ -92,7 +92,6 @@ app.post('/api/login', (req, res) => {
                 phone = data.phone
                 if (data.carDetails !== undefined) {
                     number = data.carDetails.number
-
                 }
             })
         }
@@ -157,11 +156,22 @@ app.get('/api/showTrip', (req, res) => {
     });
 })
 
+app.get('/api/getToken', (req, res) => {
+    var ObjectID = require('mongodb').ObjectID;
+    const query = db.collection('PushNotification').find({}).toArray(function (err, result) {
+        if (err) throw err;
+        if (result.length <= 0) return res.json({ data: 'no data' })
+        console.log(result);
+        res.json({data:result})
+    });
+})
+
 app.post('/api/acceptTrip', (req, res) => {
     console.log("Accept trip ", req.body);
     var ObjectID = require('mongodb').ObjectID;
     const query = db.collection('Registration').find({ phone: req.body.phone }).toArray(function (err, result) {
         if (result.length <= 0) return res.json({ data: 'no phone' })
+        if (req.body.carNumber === '') alert("no car")
         else {
             result.map(res => {
                 res.carDetails.location = req.body.address
@@ -204,17 +214,18 @@ app.post('/api/acceptTrip', (req, res) => {
                 })
             })
         }
+        db.collection('Trip').find({}).toArray(function (err, result) {
+            if (err) throw err;
+
+            if (result.length <= 0) return res.json({ data: 'no data' })
+            else {
+                var data = result.sort((a, b) => (a.date > b.date) ? -1 : ((b.date > a.date) ? 1 : 0));
+                res.send(data)
+            }
+
+        });
     })
-    db.collection('Trip').find({}).toArray(function (err, result) {
-        if (err) throw err;
 
-        if (result.length <= 0) return res.json({ data: 'no data' })
-        else {
-            var data = result.sort((a, b) => (a.date > b.date) ? -1 : ((b.date > a.date) ? 1 : 0));
-            res.send(data)
-        }
-
-    });
 })
 
 app.post('/api/addCarDetails', (req, res) => {
