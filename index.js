@@ -33,8 +33,7 @@ app.use(bodyParser.urlencoded({ extended: true }));
 
 var db;
 const mongoose = require('mongoose');
-const { token } = require('morgan');
-mongoose.connect('mongodb+srv://rakesh:uDrive@udrive.138if.mongodb.net/uDrive?retryWrites=true&w=majority', function (err, database) {
+mongoose.connect('mongodb+srv://rakesh:rocman911@udrive.oo3q3.mongodb.net/uDrive?retryWrites=true&w=majority', function (err, database) {
     if (err) return console.log("error ", err)
     db = database;
     console.log('App is listening on port ' + port);
@@ -128,7 +127,7 @@ app.post('/api/addTrip', (req, res) => {
     res.json({ data: 'trip added' })
 });
 app.post('/api/showAdminTrip', (req, res) => {
-    console.log("showAdminTrip api ", req.body);
+    console.log("showAdminTrip api ", req.body.phone);
     var ObjectID = require('mongodb').ObjectID;
     const query = db.collection('Trip').find({ postedBy: req.body.phone }).toArray(function (err, result) {
         if (err) throw err;
@@ -138,8 +137,23 @@ app.post('/api/showAdminTrip', (req, res) => {
             var data = result.sort((a, b) => (a.date > b.date) ? -1 : ((b.date > a.date) ? 1 : 0));
             res.send(data)
         }
-
     });
+})
+app.post('/api/deleteTrip', (req, res) => {
+    db.collection('Trip').deleteOne({ tripId: req.body.id }).then(() => {
+        const query = db.collection('Trip').find({ postedBy: req.body.phone }).toArray(function (err, result) {
+            if (err) throw err;
+
+            if (result.length <= 0) return res.json({ data: 'no data' })
+            else {
+                var data = result.sort((a, b) => (a.date > b.date) ? -1 : ((b.date > a.date) ? 1 : 0));
+                res.send(data)
+            }
+
+        });
+    })
+
+
 })
 app.get('/api/showTrip', (req, res) => {
     console.log("show trip api");
@@ -162,7 +176,7 @@ app.get('/api/getToken', (req, res) => {
         if (err) throw err;
         if (result.length <= 0) return res.json({ data: 'no data' })
         console.log(result);
-        res.json({data:result})
+        res.json({ data: result })
     });
 })
 
@@ -236,12 +250,13 @@ app.post('/api/addCarDetails', (req, res) => {
         modal: req.body.modal,
         capacity: req.body.capacity,
         year: req.body.year,
-        number: req.body.number
+        number: req.body.number,
+        phone: req.body.phone
     };
     db.collection('Registration').updateOne(
         { phone: req.body.phone },
         {
-            $set: { carDetails: { make: req.body.make, modal: req.body.modal, year: req.body.year, capacity: req.body.capacity, number: req.body.number } },
+            $set: { carDetails: { make: req.body.make, modal: req.body.modal, year: req.body.year, capacity: req.body.capacity, number: req.body.number, phone: req.body.phone } },
         }
     )
     res.json({ data: 'addCarDetails added' })
