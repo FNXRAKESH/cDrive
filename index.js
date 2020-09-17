@@ -119,6 +119,7 @@ app.post('/api/addTrip', (req, res) => {
         status: "new trip",
         tripId: uuid(),
         rate: req.body.rate,
+        token: req.body.tok,
         _id: new ObjectID()
     };
     if (req.body.distance === 0) return res.json({ data: "No route for entered locations" })
@@ -182,6 +183,7 @@ app.get('/api/getToken', (req, res) => {
 
 app.post('/api/acceptTrip', (req, res) => {
     console.log("Accept trip ", req.body);
+    var token = ''
     var ObjectID = require('mongodb').ObjectID;
     const query = db.collection('Registration').find({ phone: req.body.phone }).toArray(function (err, result) {
         if (result.length <= 0) return res.json({ data: 'no phone' })
@@ -195,9 +197,12 @@ app.post('/api/acceptTrip', (req, res) => {
                     {
                         success.map(i => {
                             {
+                                console.log("i.token ", i.token);
+                                token = i.token
                                 i.hasOwnProperty('cabs') ?
                                     i.cabs.map(car => {
                                         if (car.number === req.body.carNumber) return res.json({ data: "already registered" });
+
                                         var query = db.collection('Trip').updateOne(
                                             { tripId: req.body.id },
                                             {
@@ -209,6 +214,7 @@ app.post('/api/acceptTrip', (req, res) => {
                                             } ,
 
                                         )
+
                                     })
                                     : db.collection('Trip').updateOne(
                                         { tripId: req.body.id },
@@ -218,9 +224,10 @@ app.post('/api/acceptTrip', (req, res) => {
                                                 "cabs": res.carDetails
                                             },
 
-                                        } ,
+                                        },
 
                                     )
+
                             }
                         })
                     }
@@ -234,10 +241,11 @@ app.post('/api/acceptTrip', (req, res) => {
             if (result.length <= 0) return res.json({ data: 'no data' })
             else {
                 var data = result.sort((a, b) => (a.date > b.date) ? -1 : ((b.date > a.date) ? 1 : 0));
-                res.send(data)
+                res.json({ data: data, token: token })
             }
 
         });
+
     })
 
 })
@@ -319,6 +327,27 @@ app.post('/api/acceptCab', (req, res) => {
         });
     })
 
+})
+
+app.post('/api/saveProfile', (req, res) => {
+    db.collection('Registration').find({ phone: req.body.phone }).toArray(function (err, result) {
+        if (err) throw err;
+        if (result.length <= 0) return res.json({ data: 'no data' })
+        var ObjectID = require('mongodb').ObjectID;
+        var profile = {
+            email:req.body.email,
+            phone: req.body.phone,
+            name: req.body.name,
+            _id: new ObjectID()
+        };
+        db.collection('Registration').updateOne(
+            { phone: req.body.phone },
+            {
+                $set: { "size.uom": "cm", status: "P" },
+                $currentDate: { lastModified: true }
+            }
+        )
+    });
 })
 
 module.exports = router;
