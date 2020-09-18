@@ -186,42 +186,40 @@ app.post('/api/acceptTrip', (req, res) => {
     var token = ''
     var ObjectID = require('mongodb').ObjectID;
     const query = db.collection('Registration').find({ phone: req.body.phone }).toArray(function (err, result) {
+        console.log(result);
         if (result.length <= 0) return res.json({ data: 'no phone' })
         if (req.body.carNumber === '') alert("no car")
         else {
             result.map(res => {
                 res.carDetails.location = req.body.address
                 res.carDetails.status = "pending"
-
                 db.collection('Trip').find({ tripId: req.body.id }).toArray(function (err, success) {
                     {
+                        console.log("success ", success);
                         success.map(i => {
                             {
                                 console.log("i.token ", i.token);
                                 token = i.token
-                                i.hasOwnProperty('cabs') ?
-                                    i.cabs.map(car => {
+                                i.hasOwnProperty('cabDetails') ?
+                                    i.cabDetails.map(car => {
+                                        console.log(car.number);
                                         if (car.number === req.body.carNumber) return res.json({ data: "already registered" });
-
-                                        var query = db.collection('Trip').updateOne(
+                                        else db.collection('Trip').updateOne(
                                             { tripId: req.body.id },
                                             {
                                                 $set: { "status": "applied" },
                                                 $push: {
-                                                    "cabs": res.carDetails
+                                                    "cabDetails": res.carDetails
                                                 },
-
-                                            } ,
-
+                                            },
                                         )
-
                                     })
                                     : db.collection('Trip').updateOne(
                                         { tripId: req.body.id },
                                         {
                                             $set: { "status": "applied" },
                                             $push: {
-                                                "cabs": res.carDetails
+                                                "cabDetails": res.carDetails
                                             },
 
                                         },
@@ -252,22 +250,38 @@ app.post('/api/acceptTrip', (req, res) => {
 
 app.post('/api/addCarDetails', (req, res) => {
     console.log("addCarDetails req.body ", req.body);
-    var ObjectID = require('mongodb').ObjectID;
-    var detials = {
-        make: req.body.make,
-        modal: req.body.modal,
-        capacity: req.body.capacity,
-        year: req.body.year,
-        number: req.body.number,
-        phone: req.body.phone
-    };
-    db.collection('Registration').updateOne(
-        { phone: req.body.phone },
+    db.collection('Registration').find({ phone: req.body.phone }).toArray(function (err, success) {
         {
-            $set: { carDetails: { make: req.body.make, modal: req.body.modal, year: req.body.year, capacity: req.body.capacity, number: req.body.number, phone: req.body.phone } },
+            success.map(i => {
+                {
+                    i.hasOwnProperty('carDetails') ?
+                        i.carDetails.map(p => {
+                            db.collection('Registration').updateOne(
+                                { phone: req.body.phone },
+                                {
+                                    $set: { 'carDetails': { make: req.body.make, modal: req.body.modal, year: req.body.year, capacity: req.body.capacity, number: req.body.number, phone: req.body.phone } },
+                                },
+
+                            )
+
+                        })
+                        : db.collection('Registration').updateOne(
+                            { phone: req.body.phone },
+                            {
+                                $set: {
+                                    "carDetails": { make: req.body.make, modal: req.body.modal, year: req.body.year, capacity: req.body.capacity, number: req.body.number, phone: req.body.phone }
+                                },
+
+                            },
+
+                        )
+
+                }
+            })
         }
-    )
-    res.json({ data: 'addCarDetails added' })
+        res.json({ data: 'addCarDetails added' })
+    })
+
 })
 
 app.post('/api/showCabs', (req, res) => {
@@ -295,16 +309,17 @@ app.post('/api/acceptCab', (req, res) => {
         if (result.length <= 0) return res.json({ data: 'no data' })
         else {
             result.map(res => {
-                console.log("latitude, longitude ", res.cabs);
+                console.log("latitude, longitude ", res.cabDetails);
                 {
-                    (res.cabs).map(cab => {
+                    (res.cabDetails).map(cab => {
+                        console.log(cab.number);
                         if (cab.number === req.body.carNumber) {
                             cab.status = "approved"
                             console.log(cab.status);
                             db.collection('Trip').updateOne(
-                                { tripId: req.body.tripId, "cabs.number": cab.number },
+                                { tripId: req.body.tripId, "cabDetails.number": cab.number },
                                 {
-                                    $set: { "status": "closed", "cabs.$.status": 'approved' },
+                                    $set: { "status": "closed", "cabDetails.$.status": 'approved' },
                                 } ,
                             )
                         }
@@ -330,23 +345,54 @@ app.post('/api/acceptCab', (req, res) => {
 })
 
 app.post('/api/saveProfile', (req, res) => {
+    console.log(req.body);
+    db.collection('Registration').find({ phone: req.body.phone }).toArray(function (err, success) {
+        {
+            success.map(i => {
+                {
+                    i.hasOwnProperty('profile') ?
+                        i.profile.map(p => {
+                            db.collection('Registration').updateOne(
+                                { phone: req.body.phone },
+                                {
+                                    $set: { phone: req.body.newphone, "profile": [{ email: req.body.email, name: req.body.name }] }
+                                },
+
+                            )
+
+                        })
+                        : db.collection('Registration').updateOne(
+                            { phone: req.body.phone },
+                            {
+                                $set: { phone: req.body.newphone },
+                                $push: {
+                                    "profile": { email: req.body.email, name: req.body.name }
+                                },
+
+                            },
+
+                        )
+
+                }
+            })
+        }
+        res.json({ data: "profile updated" })
+    })
+})
+
+app.post('/api/showProfile', (req, res) => {
+    var email, name
     db.collection('Registration').find({ phone: req.body.phone }).toArray(function (err, result) {
         if (err) throw err;
         if (result.length <= 0) return res.json({ data: 'no data' })
-        var ObjectID = require('mongodb').ObjectID;
-        var profile = {
-            email:req.body.email,
-            phone: req.body.phone,
-            name: req.body.name,
-            _id: new ObjectID()
-        };
-        db.collection('Registration').updateOne(
-            { phone: req.body.phone },
-            {
-                $set: { "size.uom": "cm", status: "P" },
-                $currentDate: { lastModified: true }
-            }
-        )
+        result.map(i => {
+            i.hasOwnProperty('profile')
+            i.profile.map(p => {
+                name = p.name
+                email = p.email
+            })
+        })
+        res.json({ name, email })
     });
 })
 
