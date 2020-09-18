@@ -302,24 +302,30 @@ app.post('/api/showCabs', (req, res) => {
 
 app.post('/api/acceptCab', (req, res) => {
     console.log(req.body);
-
-    var ObjectID = require('mongodb').ObjectID;
-    var phoneNumber = req.body.phone
-    const query = db.collection('Trip').find({ tripId: req.body.tripId }).toArray(function (err, result) {
+    db.collection('Trip').find({ tripId: req.body.tripId }).toArray(function (err, result) {
         if (result.length <= 0) return res.json({ data: 'no data' })
         else {
             result.map(res => {
                 console.log("latitude, longitude ", res.cabDetails);
                 {
                     (res.cabDetails).map(cab => {
-                        console.log(cab.number);
+
                         if (cab.number === req.body.carNumber) {
                             cab.status = "approved"
                             console.log(cab.status);
                             db.collection('Trip').updateOne(
                                 { tripId: req.body.tripId, "cabDetails.number": cab.number },
                                 {
-                                    $set: { "status": "closed", "cabDetails.$.status": 'approved' },
+                                    $set: { "status": "closed", "cabDetails.$.status": 'approved', "approvedTo": req.body.carNumber },
+                                } ,
+                            )
+                        }
+                        else {
+                            cab.status = "applied"
+                            db.collection('Trip').updateOne(
+                                { tripId: req.body.tripId, "cabDetails.number": cab.number },
+                                {
+                                    $set: { "status": "closed", "cabDetails.$.status": 'applied' },
                                 } ,
                             )
                         }
@@ -345,7 +351,7 @@ app.post('/api/acceptCab', (req, res) => {
 })
 
 app.post('/api/saveProfile', (req, res) => {
-    console.log(req.body);
+    console.log("saveProfile " ,req.body);
     db.collection('Registration').find({ phone: req.body.phone }).toArray(function (err, success) {
         {
             success.map(i => {
