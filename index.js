@@ -8,38 +8,34 @@ var cors = require('cors')
 const app = express();
 app.use(cors())
 const { uuid } = require('uuidv4');
-
 const dev = app.get('env') !== 'production'
 if (!dev) {
     app.disable('x-powered-by')
     app.use(compression())
     app.use(morgan('common'))
 }
-
 const port = process.env.PORT || 9000;
 app.listen(port);
-
-
 router.use(session({
     secret: 'keyboard cat',
     resave: false,
     saveUninitialized: true,
     cookie: { secure: true }
 }))
-
 app.get('/', function (req, res) { res.send('Hello!') });
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
-
 var db;
 const mongoose = require('mongoose');
+const { filter } = require('compression');
+mongoose.set('useUnifiedTopology', true);
+mongoose.connect('mongodb+srv://rakesh:rocman911@udrive.oo3q3.mongodb.net/uDrive?retryWrites=true&w=majority', { useNewUrlParser: true })
 mongoose.connect('mongodb+srv://rakesh:rocman911@udrive.oo3q3.mongodb.net/uDrive?retryWrites=true&w=majority', function (err, database) {
     if (err) return console.log("error ", err)
     db = database;
     console.log('App is listening on port ' + port);
 })
 app.post('/api/register', (req, res) => {
-    console.log(req.body);
     var ObjectID = require('mongodb').ObjectID;
     var user = {
         phone: req.body.phone,
@@ -48,24 +44,20 @@ app.post('/api/register', (req, res) => {
         _id: new ObjectID()
     };
     const query = db.collection('Registration').find({ phone: req.body.phone }).toArray(function (err, result) {
-        console.log(result);
         if (result.length > 0) return res.json({ data: 'already registered' })
         else {
             db.collection('Registration').insertOne(user);
             res.json({ data: 'record added' })
         }
-
     });
 })
 app.post('/api/pushNotification', (req, res) => {
-    console.log(req.body);
     var ObjectID = require('mongodb').ObjectID;
     var user = {
         token: req.body.token,
         _id: new ObjectID()
     };
-    const query = db.collection('PushNotification').find({ token: req.body.token }).toArray(function (err, result) {
-        console.log(result);
+    db.collection('PushNotification').find({ token: req.body.token }).toArray(function (err, result) {
         if (result.length > 0) return res.json({ data: 'already added this pushNotification' })
         else {
             db.collection('PushNotification').insertOne(user);
@@ -75,15 +67,12 @@ app.post('/api/pushNotification', (req, res) => {
 })
 
 app.post('/api/login', (req, res) => {
-    var ObjectID = require('mongodb').ObjectID;
     var role, phone, carDetails = "true", number
-    const query = db.collection('Registration').find({ phone: req.body.phone, password: req.body.password }).toArray(function (err, result) {
-        console.log(result);
+    db.collection('Registration').find({ phone: req.body.phone, password: req.body.password }).toArray(function (err, result) {
         if (result.length <= 0) return res.json({ data: 'no data' })
         // else return res.json({ data: 'data available' })
         else {
             result.map(data => {
-                console.log("data.carDetails ", data.carDetails);
                 if (data.carDetails === undefined) {
                     carDetails = "false"
                 }
@@ -91,17 +80,16 @@ app.post('/api/login', (req, res) => {
                 phone = data.phone
                 if (data.carDetails !== undefined) {
                     number = data.carDetails.number
+
                 }
             })
         }
-        console.log("undefined ", carDetails);
         if (role === "Admin") return res.json({ data: "Admin", phone: phone })
         if (role === "Driver") return res.json({ data: "Driver", phone: phone, carDetails: number })
     })
 });
 
 app.post('/api/addTrip', (req, res) => {
-    console.log(req.body);
     var ObjectID = require('mongodb').ObjectID;
     var today = new Date();
     var trip = {
@@ -128,11 +116,8 @@ app.post('/api/addTrip', (req, res) => {
     res.json({ data: 'trip added' })
 });
 app.post('/api/showAdminTrip', (req, res) => {
-    console.log("showAdminTrip api ", req.body.phone);
-    var ObjectID = require('mongodb').ObjectID;
-    const query = db.collection('Trip').find({ postedBy: req.body.phone }).toArray(function (err, result) {
+    db.collection('Trip').find({ postedBy: req.body.phone }).toArray(function (err, result) {
         if (err) throw err;
-
         if (result.length <= 0) return res.json({ data: 'no data' })
         else {
             var data = result.sort((a, b) => (a.date > b.date) ? -1 : ((b.date > a.date) ? 1 : 0));
@@ -142,32 +127,52 @@ app.post('/api/showAdminTrip', (req, res) => {
 })
 app.post('/api/deleteTrip', (req, res) => {
     db.collection('Trip').deleteOne({ tripId: req.body.id }).then(() => {
-        const query = db.collection('Trip').find({ postedBy: req.body.phone }).toArray(function (err, result) {
+        db.collection('Trip').find({ postedBy: req.body.phone }).toArray(function (err, result) {
             if (err) throw err;
-
             if (result.length <= 0) return res.json({ data: 'no data' })
             else {
                 var data = result.sort((a, b) => (a.date > b.date) ? -1 : ((b.date > a.date) ? 1 : 0));
                 res.send(data)
             }
-
         });
     })
-
-
 })
-app.get('/api/showTrip', (req, res) => {
-    console.log("show trip api");
-    var ObjectID = require('mongodb').ObjectID;
-    const query = db.collection('Trip').find({}).toArray(function (err, result) {
-        if (err) throw err;
 
+app.post('/api/showTrip', (req, res) => {
+    var filtered, data
+
+    db.collection('Trip').find({}).toArray(function (err, result) {
+        if (err) throw err;
         if (result.length <= 0) return res.json({ data: 'no data' })
+
+        result.map(i => {
+            i.hasOwnProperty('cabDetails') ?
+                i.cabDetails.map(car => {
+                    if ((car.status === "rejected") && (car.number === req.body.carNumber)) {
+                        db.collection('Trip').update({ tripId: i.tripId },
+                            { $unset: { "cabDetails": { number: req.body.carNumber } }, $set: { "status": "new trip" } },
+                        )
+
+                        filtered = result.filter(function (el) { return el.tripId !== i.tripId; });
+
+                    }
+                    // else if (car.number === req.body.carNumber) {
+                    //     filtered = result.filter(function (el) { return el.tripId === i.tripId; });
+                    //     console.log("appplied", filtered);
+                    // }
+                }) :
+                data = result.sort((a, b) => (a.date > b.date) ? -1 : ((b.date > a.date) ? 1 : 0));
+        })
+
+        if (filtered !== undefined) {
+            var dataResult = data.filter(item1 =>
+                !filtered.some(item2 => (item2.tripId !== item1.tripId)))
+
+            res.send(dataResult)
+        }
         else {
-            var data = result.sort((a, b) => (a.date > b.date) ? -1 : ((b.date > a.date) ? 1 : 0));
             res.send(data)
         }
-
     });
 })
 
@@ -176,80 +181,86 @@ app.get('/api/getToken', (req, res) => {
     const query = db.collection('PushNotification').find({}).toArray(function (err, result) {
         if (err) throw err;
         if (result.length <= 0) return res.json({ data: 'no data' })
-        console.log(result);
         res.json({ data: result })
     });
 })
 
 app.post('/api/acceptTrip', (req, res) => {
-    console.log("Accept trip ", req.body);
     var token = ''
-    var ObjectID = require('mongodb').ObjectID;
-    const query = db.collection('Registration').find({ phone: req.body.phone }).toArray(function (err, result) {
-        console.log(result);
-        if (result.length <= 0) return res.json({ data: 'no phone' })
-        if (req.body.carNumber === '') alert("no car")
+    db.collection('History').find({ "trip.tripId": req.body.id, phone: req.body.phone }).toArray(function (e, i) {
+        if (e) throw e;
+
+        if (i.length > 0) res.json({ data: "already applied" })
         else {
-            result.map(res => {
-                res.carDetails.location = req.body.address
-                res.carDetails.status = "pending"
-                db.collection('Trip').find({ tripId: req.body.id }).toArray(function (err, success) {
-                    {
-                        console.log("success ", success);
-                        success.map(i => {
-                            {
-                                console.log("i.token ", i.token);
-                                token = i.token
-                                i.hasOwnProperty('cabDetails') ?
-                                    i.cabDetails.map(car => {
-                                        console.log(car.number);
-                                        if (car.number === req.body.carNumber) return res.json({ data: "already registered" });
-                                        else db.collection('Trip').updateOne(
+            const query = db.collection('Registration').find({ phone: req.body.phone }).toArray(function (err, result) {
+                if (result.length <= 0) return res.json({ data: 'no phone' })
+                if (req.body.carNumber === '') alert("no car")
+                else {
+                    result.map(res => {
+                        res.carDetails.location = req.body.address
+                        res.carDetails.status = "pending"
+                        db.collection('Trip').find({ tripId: req.body.id }).toArray(function (err, success) {
+                            success.map(i => {
+                                {
+                                    token = i.token
+                                    i.hasOwnProperty('cabDetails') ?
+                                        i.cabDetails.map(car => {
+
+                                            if (car.number === req.body.carNumber) return res.json({ data: "already registered" });
+                                            else db.collection('Trip').updateOne(
+                                                { tripId: req.body.id },
+                                                {
+                                                    $set: { "status": "applied" },
+                                                    $push: {
+                                                        "cabDetails": res.carDetails
+                                                    },
+                                                },
+                                            )
+                                        })
+                                        : db.collection('Trip').updateOne(
                                             { tripId: req.body.id },
                                             {
                                                 $set: { "status": "applied" },
                                                 $push: {
                                                     "cabDetails": res.carDetails
                                                 },
+
                                             },
+
                                         )
-                                    })
-                                    : db.collection('Trip').updateOne(
-                                        { tripId: req.body.id },
-                                        {
-                                            $set: { "status": "applied" },
-                                            $push: {
-                                                "cabDetails": res.carDetails
-                                            },
 
-                                        },
-
-                                    )
-
+                                }
+                            })
+                            var History = {
+                                trip: success[0],
+                                phone: req.body.phone,
+                                status: "applied"
                             }
+                            db.collection('History').insertOne(History);
                         })
+                    })
+                }
+
+                db.collection('Trip').find({}).toArray(function (err, result) {
+                    if (err) throw err;
+
+                    if (result.length <= 0) return res.json({ data: 'no data' })
+                    else {
+                        var data = result.sort((a, b) => (a.date > b.date) ? -1 : ((b.date > a.date) ? 1 : 0));
+                        res.json({ data: data, token: token })
                     }
 
-                })
+                });
+
             })
         }
-        db.collection('Trip').find({}).toArray(function (err, result) {
-            if (err) throw err;
+    });
 
-            if (result.length <= 0) return res.json({ data: 'no data' })
-            else {
-                var data = result.sort((a, b) => (a.date > b.date) ? -1 : ((b.date > a.date) ? 1 : 0));
-                res.json({ data: data, token: token })
-            }
-
-        });
-
-    })
 
 })
 
 app.post('/api/addCarDetails', (req, res) => {
-    console.log("addCarDetails req.body ", req.body);
+
     db.collection('Registration').find({ phone: req.body.phone }).toArray(function (err, success) {
         {
             success.map(i => {
@@ -284,35 +295,31 @@ app.post('/api/addCarDetails', (req, res) => {
 
 })
 
-app.post('/api/showCabs', (req, res) => {
-    console.log("show trip");
-    var carDetails = []
-    var ObjectID = require('mongodb').ObjectID;
-    const query = db.collection('Registration').find({ role: "Driver", phone: req.body.phone }).toArray(function (err, result) {
-        if (err) throw err;
+// app.post('/api/showCabs', (req, res) => {
+//     console.log("show trip");
+//     var carDetails = []
+//     var ObjectID = require('mongodb').ObjectID;
+//     const query = db.collection('Registration').find({ role: "Driver", phone: req.body.phone }).toArray(function (err, result) {
+//         if (err) throw err;
 
-        if (result.length <= 0) return res.json({ data: 'no data' })
-        result.map(res => {
-            console.log("result ", res);
-            carDetails = res
-        })
-        res.json(carDetails)
-    });
-})
+//         if (result.length <= 0) return res.json({ data: 'no data' })
+//         result.map(res => {
+//             console.log("result.status ", res.status);
+//             carDetails = res
+//         })
+//         res.json(carDetails)
+//     });
+// })
 
 app.post('/api/acceptCab', (req, res) => {
-    console.log(req.body);
     db.collection('Trip').find({ tripId: req.body.tripId }).toArray(function (err, result) {
         if (result.length <= 0) return res.json({ data: 'no data' })
         else {
             result.map(res => {
-                console.log("latitude, longitude ", res.cabDetails);
                 {
                     (res.cabDetails).map(cab => {
-
                         if (cab.number === req.body.carNumber) {
                             cab.status = "approved"
-                            console.log(cab.status);
                             db.collection('Trip').updateOne(
                                 { tripId: req.body.tripId, "cabDetails.number": cab.number },
                                 {
@@ -331,11 +338,72 @@ app.post('/api/acceptCab', (req, res) => {
                         }
                     })
                 }
-
-
             })
-
         }
+        db.collection('History').find({ "trip.tripId": req.body.tripId }).toArray(function (err, result) {
+            if (err) throw err;
+            if (result.length <= 0) return res.json({ data: 'no data' })
+            else {
+                {
+                    result.map(i => {
+                        db.collection('History').updateOne(
+                            { "trip.tripId": req.body.tripId, "phone": i.phone },
+                            {
+                                $set: { "status": "approved" },
+                            } ,
+                        )
+                    })
+                }
+            }
+        });
+        db.collection('Trip').find({}).toArray(function (err, result) {
+            if (err) throw err;
+            if (result.length <= 0) return res.json({ data: 'no data' })
+            else {
+                var data = result.sort((a, b) => (a.date > b.date) ? -1 : ((b.date > a.date) ? 1 : 0));
+                res.send(data)
+            }
+        });
+    })
+})
+
+app.post('/api/rejectCab', (req, res) => {
+    db.collection('Trip').find({ tripId: req.body.tripId }).toArray(function (err, result) {
+        if (result.length <= 0) return res.json({ data: 'no data' })
+        else {
+            result.map(res => {
+                {
+                    (res.cabDetails).map(cab => {
+                        if (cab.number === req.body.carNumber) {
+                            cab.status = "rejected"
+                            db.collection('Trip').updateOne(
+                                { tripId: req.body.tripId, "cabDetails.number": cab.number },
+                                {
+                                    $set: { "cabDetails.$.status": 'rejected' },
+                                } ,
+                            )
+                        }
+                    })
+                }
+            })
+        }
+        db.collection('History').find({ "trip.tripId": req.body.tripId }).toArray(function (err, result) {
+            if (err) throw err;
+            if (result.length <= 0) return res.json({ data: 'no data' })
+            else {
+                {
+                    result.map(i => {
+                        db.collection('History').updateOne(
+                            { "trip.tripId": req.body.tripId, "phone": i.phone },
+                            {
+                                $set: { "status": "rejected" },
+                            } ,
+                        )
+                    })
+                }
+            }
+
+        });
         db.collection('Trip').find({}).toArray(function (err, result) {
             if (err) throw err;
 
@@ -347,11 +415,9 @@ app.post('/api/acceptCab', (req, res) => {
 
         });
     })
-
 })
 
 app.post('/api/saveProfile', (req, res) => {
-    console.log("saveProfile " ,req.body);
     db.collection('Registration').find({ phone: req.body.phone }).toArray(function (err, success) {
         {
             success.map(i => {
@@ -363,9 +429,7 @@ app.post('/api/saveProfile', (req, res) => {
                                 {
                                     $set: { phone: req.body.newphone, "profile": [{ email: req.body.email, name: req.body.name }] }
                                 },
-
                             )
-
                         })
                         : db.collection('Registration').updateOne(
                             { phone: req.body.phone },
@@ -374,11 +438,8 @@ app.post('/api/saveProfile', (req, res) => {
                                 $push: {
                                     "profile": { email: req.body.email, name: req.body.name }
                                 },
-
                             },
-
                         )
-
                 }
             })
         }
@@ -399,6 +460,16 @@ app.post('/api/showProfile', (req, res) => {
             })
         })
         res.json({ name, email })
+    });
+})
+
+app.post('/api/showHistory', (req, res) => {
+    db.collection('History').find({ phone: req.body.phone }).toArray(function (err, result) {
+        if (err) throw err;
+        if (result.length <= 0) return res.json({ data: 'no data' })
+        console.log(result);
+        data = result.sort((a, b) => (a.date > b.date) ? -1 : ((b.date > a.date) ? 1 : 0));
+        res.json(data)
     });
 })
 
