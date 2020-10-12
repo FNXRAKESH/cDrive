@@ -25,7 +25,7 @@ router.use(session({
 app.get('/', function (req, res) { res.send('Hello!') });
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
-var db;
+var db, otpStatus;
 const mongoose = require('mongoose');
 const { filter } = require('compression');
 mongoose.set('useUnifiedTopology', true);
@@ -36,20 +36,50 @@ mongoose.connect('mongodb+srv://rakesh:rocman911@udrive.oo3q3.mongodb.net/uDrive
     console.log('App is listening on port ' + port);
 })
 app.post('/api/register', (req, res) => {
-    var ObjectID = require('mongodb').ObjectID;
+    const SendOtp = require('sendotp');
+    const sendOtp = new SendOtp('343917AbMdZykQY83Z5f7e9c68P1');
+    sendOtp.send(`91${req.body.phone}`, "PRIIND", function (error, data) {
+    console.log("data.type ",data.type);
+    otpStatus = data.type
+    res.json(data.type)
+    });
+})
+app.post('/api/resendOtp', (req, res) => {
+    const SendOtp = require('sendotp');
+    const sendOtp = new SendOtp('343917AbMdZykQY83Z5f7e9c68P1');
+    sendOtp.retry(`91${req.body.phone}`, true, function (error, data) {
+    console.log("data.type ",data.type);
+    });
+})
+app.post('/api/verifyOtp', (req, res) => {
+    const SendOtp = require('sendotp');
+    const sendOtp = new SendOtp('343917AbMdZykQY83Z5f7e9c68P1');
+     var ObjectID = require('mongodb').ObjectID;
     var user = {
         phone: req.body.phone,
         password: req.body.password,
         role: req.body.selectedValue,
         _id: new ObjectID()
     };
-    const query = db.collection('Registration').find({ phone: req.body.phone }).toArray(function (err, result) {
+    console.log("opt ",req.body, otpStatus);
+    if(otpStatus==="success"){
+        sendOtp.verify(`91${req.body.phone}`, `${req.body.otp}`, function (error, data) {
+        console.log(data); // data object with keys 'message' and 'type'
+        if(data.type == 'success') {
+            const query = db.collection('Registration').find({ phone: req.body.phone }).toArray(function (err, result) {
         if (result.length > 0) return res.json({ data: 'already registered' })
         else {
             db.collection('Registration').insertOne(user);
             res.json({ data: 'record added' })
         }
     });
+        }
+        if(data.type == 'error'){ 
+            console.log('OTP verification failed')
+            res.json({data:"otp failed"})
+        }
+        });
+    }
 })
 app.post('/api/pushNotification', (req, res) => {
     var ObjectID = require('mongodb').ObjectID;
@@ -171,6 +201,7 @@ app.post('/api/showTrip', (req, res) => {
             res.send(dataResult)
         }
         else {
+
             res.send(data)
         }
     });
@@ -186,6 +217,7 @@ app.get('/api/getToken', (req, res) => {
 })
 
 app.post('/api/acceptTrip', (req, res) => {
+
     var token = ''
     db.collection('History').find({ "trip.tripId": req.body.id, phone: req.body.phone }).toArray(function (e, i) {
         if (e) throw e;
@@ -464,10 +496,11 @@ app.post('/api/showProfile', (req, res) => {
 })
 
 app.post('/api/showHistory', (req, res) => {
+
     db.collection('History').find({ phone: req.body.phone }).toArray(function (err, result) {
         if (err) throw err;
         if (result.length <= 0) return res.json({ data: 'no data' })
-        console.log(result);
+
         data = result.sort((a, b) => (a.date > b.date) ? -1 : ((b.date > a.date) ? 1 : 0));
         res.json(data)
     });
