@@ -504,6 +504,57 @@ app.post('/api/showHistory', (req, res) => {
     });
 })
 
+app.post('/api/forgotPassword', (req, res) => { 
+    const SendOtp = require('sendotp');
+    const sendOtp = new SendOtp('343917AbMdZykQY83Z5f7e9c68P1');
+    sendOtp.send(`91${req.body.phone}`, "PRIIND", function (error, data) {
+    console.log("data.type ",data.type);
+    otpStatus = data.type
+    res.json(data.type)
+    });
+})
+
+app.post('/api/forgotPasswordResendOtp', (req, res) => {
+    const SendOtp = require('sendotp');
+    const sendOtp = new SendOtp('343917AbMdZykQY83Z5f7e9c68P1');
+    sendOtp.retry(`91${req.body.phone}`, true, function (error, data) {
+    console.log("data.type ",data.type);
+    });
+})
+app.post('/api/forgotPasswordVerifyOtp', (req, res) => {
+    const SendOtp = require('sendotp');
+    const sendOtp = new SendOtp('343917AbMdZykQY83Z5f7e9c68P1');
+     var ObjectID = require('mongodb').ObjectID;
+     
+    if(otpStatus==="success"){
+        sendOtp.verify(`91${req.body.phone}`, `${req.body.otp}`, function (error, data) {
+        console.log(data); // data object with keys 'message' and 'type'
+        if(data.type == 'success') {
+         db.collection('Registration').find({ phone: req.body.phone }).toArray(function (err, result) {
+        if (result.length <= 0) return res.json({ data: 'no data' })
+        // else return res.json({ data: 'data available' })
+        else {
+            db.collection('Registration').updateOne(
+   { phone: req.body.phone },
+   {
+     $set: {
+       password: req.body.password,
+     }
+   }
+   
+)
+        }
+        res.json({data:'password Changed'})
+    })
+        }
+        if(data.type == 'error'){ 
+            console.log('OTP verification failed')
+            res.json({data:"otp failed"})
+        }
+        });
+    }
+})
+
 module.exports = router;
 
 
