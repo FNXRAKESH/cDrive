@@ -495,13 +495,11 @@ app.post('/api/showProfile', (req, res) => {
     });
 })
 
-app.post('/api/showHistory', (req, res) => {
-
-    db.collection('History').find({ phone: req.body.phone }).toArray(function (err, result) {
+app.post('/api/showHistory', (req, res) => { 
+    db.collection('History').find({ phone: `${req.body.phone}` }).toArray(function (err, result) { 
         if (err) throw err;
         if (result.length <= 0) return res.json({ data: 'no data' })
-
-        data = result.sort((a, b) => (a.date > b.date) ? -1 : ((b.date > a.date) ? 1 : 0));
+        data = result.sort((a, b) => (a.date > b.date) ? -1 : ((b.date > a.date) ? 1 : 0));     
         res.json(data)
     });
 })
