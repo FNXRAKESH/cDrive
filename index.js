@@ -38,8 +38,8 @@ mongoose.connect('mongodb+srv://rakesh:rocman911@udrive.oo3q3.mongodb.net/uDrive
 app.post('/api/register', (req, res) => {
     const SendOtp = require('sendotp');
     const sendOtp = new SendOtp('343917AbMdZykQY83Z5f7e9c68P1');
-    sendOtp.send(`91${req.body.phone}`, "PRIIND", function (error, data) {
-    console.log("data.type ",data.type);
+    sendOtp.send(`${req.body.formattedValue}`, "PRIIND", function (error, data) {
+  
     otpStatus = data.type
     res.json(data.type)
     });
@@ -47,8 +47,8 @@ app.post('/api/register', (req, res) => {
 app.post('/api/resendOtp', (req, res) => {
     const SendOtp = require('sendotp');
     const sendOtp = new SendOtp('343917AbMdZykQY83Z5f7e9c68P1');
-    sendOtp.retry(`91${req.body.phone}`, true, function (error, data) {
-    console.log("data.type ",data.type);
+    sendOtp.retry(`${req.body.formattedValue}`, true, function (error, data) {
+   
     });
 })
 app.post('/api/verifyOtp', (req, res) => {
@@ -56,17 +56,17 @@ app.post('/api/verifyOtp', (req, res) => {
     const sendOtp = new SendOtp('343917AbMdZykQY83Z5f7e9c68P1');
      var ObjectID = require('mongodb').ObjectID;
     var user = {
-        phone: req.body.phone,
+        phone: req.body.formattedValue,
         password: req.body.password,
         role: req.body.selectedValue,
         _id: new ObjectID()
     };
-    console.log("opt ",req.body, otpStatus);
+    
     if(otpStatus==="success"){
-        sendOtp.verify(`91${req.body.phone}`, `${req.body.otp}`, function (error, data) {
-        console.log(data); // data object with keys 'message' and 'type'
+        sendOtp.verify(`${req.body.formattedValue}`, `${req.body.otp}`, function (error, data) {
+       
         if(data.type == 'success') {
-            const query = db.collection('Registration').find({ phone: req.body.phone }).toArray(function (err, result) {
+            const query = db.collection('Registration').find({ phone: req.body.formattedValue }).toArray(function (err, result) {
         if (result.length > 0) return res.json({ data: 'already registered' })
         else {
             db.collection('Registration').insertOne(user);
@@ -75,7 +75,7 @@ app.post('/api/verifyOtp', (req, res) => {
     });
         }
         if(data.type == 'error'){ 
-            console.log('OTP verification failed')
+            
             res.json({data:"otp failed"})
         }
         });
@@ -97,8 +97,9 @@ app.post('/api/pushNotification', (req, res) => {
 })
 
 app.post('/api/login', (req, res) => {
+   
     var role, phone, carDetails = "true", number
-    db.collection('Registration').find({ phone: req.body.phone, password: req.body.password }).toArray(function (err, result) {
+    db.collection('Registration').find({ phone: req.body.formattedValue, password: req.body.password }).toArray(function (err, result) {
         if (result.length <= 0) return res.json({ data: 'no data' })
         // else return res.json({ data: 'data available' })
         else {
@@ -217,11 +218,9 @@ app.get('/api/getToken', (req, res) => {
 })
 
 app.post('/api/acceptTrip', (req, res) => {
-
     var token = ''
     db.collection('History').find({ "trip.tripId": req.body.id, phone: req.body.phone }).toArray(function (e, i) {
         if (e) throw e;
-
         if (i.length > 0) res.json({ data: "already applied" })
         else {
             const query = db.collection('Registration').find({ phone: req.body.phone }).toArray(function (err, result) {
@@ -238,8 +237,8 @@ app.post('/api/acceptTrip', (req, res) => {
                                     i.hasOwnProperty('cabDetails') ?
                                         i.cabDetails.map(car => {
 
-                                            if (car.number === req.body.carNumber) return res.json({ data: "already registered" });
-                                            else db.collection('Trip').updateOne(
+                                            // if (car.number === req.body.carNumber) return res.json({ data: "already registered" });
+                                             db.collection('Trip').updateOne(
                                                 { tripId: req.body.id },
                                                 {
                                                     $set: { "status": "applied" },
@@ -450,6 +449,7 @@ app.post('/api/rejectCab', (req, res) => {
 })
 
 app.post('/api/saveProfile', (req, res) => {
+    
     db.collection('Registration').find({ phone: req.body.phone }).toArray(function (err, success) {
         {
             success.map(i => {
@@ -459,14 +459,14 @@ app.post('/api/saveProfile', (req, res) => {
                             db.collection('Registration').updateOne(
                                 { phone: req.body.phone },
                                 {
-                                    $set: { phone: req.body.newphone, "profile": [{ email: req.body.email, name: req.body.name }] }
+                                    $set: { phone: req.body.formattedValue, "profile": [{ email: req.body.email, name: req.body.name }] }
                                 },
                             )
                         })
                         : db.collection('Registration').updateOne(
                             { phone: req.body.phone },
                             {
-                                $set: { phone: req.body.newphone },
+                                $set: { phone: req.body.formattedValue },
                                 $push: {
                                     "profile": { email: req.body.email, name: req.body.name }
                                 },
@@ -496,7 +496,7 @@ app.post('/api/showProfile', (req, res) => {
 })
 
 app.post('/api/showHistory', (req, res) => { 
-    db.collection('History').find({ phone: `${req.body.phone}` }).toArray(function (err, result) { 
+    db.collection('History').find({ phone: req.body.phone }).toArray(function (err, result) { 
         if (err) throw err;
         if (result.length <= 0) return res.json({ data: 'no data' })
         data = result.sort((a, b) => (a.date > b.date) ? -1 : ((b.date > a.date) ? 1 : 0));     
@@ -507,8 +507,8 @@ app.post('/api/showHistory', (req, res) => {
 app.post('/api/forgotPassword', (req, res) => { 
     const SendOtp = require('sendotp');
     const sendOtp = new SendOtp('343917AbMdZykQY83Z5f7e9c68P1');
-    sendOtp.send(`91${req.body.phone}`, "PRIIND", function (error, data) {
-    console.log("data.type ",data.type);
+    sendOtp.send(`${req.body.formattedValue}`, "PRIIND", function (error, data) {
+    
     otpStatus = data.type
     res.json(data.type)
     });
@@ -517,8 +517,8 @@ app.post('/api/forgotPassword', (req, res) => {
 app.post('/api/forgotPasswordResendOtp', (req, res) => {
     const SendOtp = require('sendotp');
     const sendOtp = new SendOtp('343917AbMdZykQY83Z5f7e9c68P1');
-    sendOtp.retry(`91${req.body.phone}`, true, function (error, data) {
-    console.log("data.type ",data.type);
+    sendOtp.retry(`${req.body.formattedValue}`, true, function (error, data) {
+  
     });
 })
 app.post('/api/forgotPasswordVerifyOtp', (req, res) => {
@@ -527,10 +527,10 @@ app.post('/api/forgotPasswordVerifyOtp', (req, res) => {
      var ObjectID = require('mongodb').ObjectID;
      
     if(otpStatus==="success"){
-        sendOtp.verify(`91${req.body.phone}`, `${req.body.otp}`, function (error, data) {
-        console.log(data); // data object with keys 'message' and 'type'
+        sendOtp.verify(`${req.body.formattedValue}`, `${req.body.otp}`, function (error, data) {
+      
         if(data.type == 'success') {
-         db.collection('Registration').find({ phone: req.body.phone }).toArray(function (err, result) {
+         db.collection('Registration').find({ phone: req.body.formattedValue }).toArray(function (err, result) {
         if (result.length <= 0) return res.json({ data: 'no data' })
         // else return res.json({ data: 'data available' })
         else {
@@ -543,12 +543,13 @@ app.post('/api/forgotPasswordVerifyOtp', (req, res) => {
    }
    
 )
+res.json({data:'password Changed'})
         }
-        res.json({data:'password Changed'})
+        
     })
         }
         if(data.type == 'error'){ 
-            console.log('OTP verification failed')
+          
             res.json({data:"otp failed"})
         }
         });
