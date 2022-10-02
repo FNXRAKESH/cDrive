@@ -123,13 +123,15 @@ app.post('/api/pushNotification', (req, res) => {
 });
 
 app.post('/api/login', (req, res) => {
+  console.log(req.body);
   var role,
     phone,
     carDetails = 'true',
     number;
   db.collection('Registration')
-    .find({ phone: req.body.formattedValue, password: req.body.password, modelName:req.body.modelName })
+    .find({ phone: req.body.phone, password: req.body.password, modelName:req.body.modelName })
     .toArray(function (err, result) {
+      console.log("result ",result);
       if (result.length <= 0) return res.json({ data: 'no data' });
       // else return res.json({ data: 'data available' })
       else {
