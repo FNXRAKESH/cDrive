@@ -32,7 +32,7 @@ app.use(bodyParser.urlencoded({ extended: true }));
 var db, otpStatus;
 const mongoose = require('mongoose');
 const { filter } = require('compression');
-mongoose.set('useUnifiedTopology', true);
+// mongoose.set('useUnifiedTopology', true);
 mongoose.connect(
   'mongodb+srv://rakesh:rocman911@udrive.oo3q3.mongodb.net/uDrive?retryWrites=true&w=majority',
   { useNewUrlParser: true }
@@ -59,40 +59,50 @@ app.post('/api/resendOtp', (req, res) => {
   sendOtp.retry(`${req.body.formattedValue}`, true, function (error, data) {});
 });
 app.post('/api/verifyOtp', (req, res) => {
-  const SendOtp = require('sendotp');
-  const sendOtp = new SendOtp('343917AbMdZykQY83Z5f7e9c68P1');
-  var ObjectID = require('mongodb').ObjectID;
+  console.log(req.body);
+  // const SendOtp = require('sendotp');
+  // const sendOtp = new SendOtp('343917AbMdZykQY83Z5f7e9c68P1');
+  var ObjectId = require('mongodb').ObjectId;
   var user = {
-    phone: req.body.formattedValue,
+    modelName: req.body.modelName,
+    phone: req.body.phone,
     password: req.body.password,
-    role: req.body.selectedValue,
-    _id: new ObjectID()
+    role: req.body.role,
+    _id: new ObjectId()
   };
-
-  if (otpStatus === 'success') {
-    sendOtp.verify(
-      `${req.body.formattedValue}`,
-      `${req.body.otp}`,
-      function (error, data) {
-        if (data.type == 'success') {
-          const query = db
-            .collection('Registration')
-            .find({ phone: req.body.formattedValue })
-            .toArray(function (err, result) {
-              if (result.length > 0)
-                return res.json({ data: 'already registered' });
-              else {
-                db.collection('Registration').insertOne(user);
-                res.json({ data: 'record added' });
-              }
-            });
-        }
-        if (data.type == 'error') {
-          res.json({ data: 'otp failed' });
-        }
-      }
-    );
-  }
+db.collection('Registration')
+  .find({ phone: req.body.phone })
+  .toArray(function (err, result) {
+    if (result.length > 0) return res.json({ data: 'already registered' });
+    else {
+      db.collection('Registration').insertOne(user);
+      res.json({ data: 'record added' });
+    }
+  });
+  // if (otpStatus === 'success') {
+  //   sendOtp.verify(
+  //     `${req.body.formattedValue}`,
+  //     `${req.body.otp}`,
+  //     function (error, data) {
+  //       if (data.type == 'success') {
+  //         const query = db
+  //           .collection('Registration')
+  //           .find({ phone: req.body.formattedValue })
+  //           .toArray(function (err, result) {
+  //             if (result.length > 0)
+  //               return res.json({ data: 'already registered' });
+  //             else {
+  //               db.collection('Registration').insertOne(user);
+  //               res.json({ data: 'record added' });
+  //             }
+  //           });
+  //       }
+  //       if (data.type == 'error') {
+  //         res.json({ data: 'otp failed' });
+  //       }
+  //     }
+  //   );
+  // }
 });
 app.post('/api/pushNotification', (req, res) => {
   var ObjectID = require('mongodb').ObjectID;
@@ -118,7 +128,7 @@ app.post('/api/login', (req, res) => {
     carDetails = 'true',
     number;
   db.collection('Registration')
-    .find({ phone: req.body.formattedValue, password: req.body.password })
+    .find({ phone: req.body.formattedValue, password: req.body.password, modelName:req.body.modelName })
     .toArray(function (err, result) {
       if (result.length <= 0) return res.json({ data: 'no data' });
       // else return res.json({ data: 'data available' })
